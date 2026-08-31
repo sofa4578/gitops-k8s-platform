@@ -1,0 +1,108 @@
+suite: webapp deployment
+templates:
+  - deployment.yaml
+  - configmap.yaml
+  - ingress.yaml
+values:
+  - ../ci-values.yaml
+release:
+  name: test
+tests:
+  - it: rejects image.tag "latest" via values.schema.json before any template renders
+    set:
+      image.tag: latest
+    asserts:
+      - failedTemplate:
+          errorPattern: "image/tag"
+
+  - it: sets spec.replicas from replicaCount when autoscaling is disabled
+    template: deployment.yaml
+    set:
+      autoscaling.enabled: false
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: omits spec.replicas entirely when autoscaling is enabled (trap 1 — Argo CD self-heal vs HPA)
+    template: deployment.yaml
+    set:
+      autoscaling.enabled: true
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: sets the required pod- and container-level securityContext baseline
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop[0]
+          value: ALL
+
+  - it: does not render an Ingress when ingress.enabled is false
+    template: ingress.yaml
+    set:
+      ingress.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not include app.kubernetes.io/version in the Deployment selector (trap 2 — selector is immutable)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.selector.matchLabels["app.kubernetes.io/version"]
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: webapp
+            app.kubernetes.io/instance: test
+
+  - it: mounts a writable emptyDir at /tmp under readOnlyRootFilesystem (trap 5)
+    template: deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir: {}
+
+  - it: sets checksum/config pod annotation so config changes trigger a restart
+    template: deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]
+
+  - it: uses RollingUpdate with maxUnavailable 0 and maxSurge 1
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 0
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 1

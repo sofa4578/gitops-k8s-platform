@@ -1,0 +1,5 @@
+# Values override used only by `helm unittest` (see tests/*_test.yaml) and
+# CI. Supplies the image.repository that values.schema.json requires but
+# values.yaml deliberately leaves empty (see the comment there).
+image:
+  repository: ghcr.io/sofa4578/webapp
