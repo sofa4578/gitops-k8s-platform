@@ -1,0 +1,23 @@
+# Packaged Helm charts
+*.tgz
+
+# Vendored Helm chart dependencies (fetched by `helm dependency build`)
+charts/**/charts/
+
+# OS cruft
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Cluster credentials — never commit a kubeconfig
+kubeconfig
+
+# Decrypted secrets — guards against ever committing a sealed secret's plaintext source
+*.decrypted.yaml
+
+# Local environment overrides
+.env

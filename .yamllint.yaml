@@ -1,0 +1,19 @@
+# yamllint config — see https://yamllint.readthedocs.io/en/stable/configuration.html
+extends: default
+
+rules:
+  # Most manifests in this repo (Kubernetes objects, Argo CD Applications) are
+  # single-document files without a leading "---" — don't force one.
+  document-start: disable
+  # Helm templates and multi-container specs run long; keep line-length a
+  # warning instead of a hard failure so CI doesn't block on cosmetic wrapping.
+  line-length:
+    max: 200
+    level: warning
+  trailing-spaces: enable
+  new-line-at-end-of-file: enable
+
+ignore: |
+  # Vendored Helm chart dependencies pulled by `helm dependency build`
+  charts/**/charts/
+  *.tgz

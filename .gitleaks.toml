@@ -1,0 +1,8 @@
+# gitleaks configuration — see https://github.com/gitleaks/gitleaks
+#
+# This project's only "secrets" are SealedSecret resources, which are
+# ciphertext by design and safe to commit. There is nothing project-specific
+# to detect beyond gitleaks' built-in rules, so we simply extend the default
+# ruleset rather than maintaining a custom one.
+[extend]
+useDefault = true
