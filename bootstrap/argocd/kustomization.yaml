@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: argocd
+resources:
+  - namespace.yaml
+  # Pinned to v2.13.2 on purpose: pulling "stable" here means a cluster built
+  # tomorrow is running a different Argo CD than the one this repo was tested
+  # against, with no diff in git to explain why.
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v2.13.2/manifests/install.yaml
+patches:
+  - path: patches/argocd-cm.yaml
