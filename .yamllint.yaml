@@ -17,3 +17,8 @@ ignore: |
   # Vendored Helm chart dependencies pulled by `helm dependency build`
   charts/**/charts/
   *.tgz
+  # Helm template sources contain Go template directives ({{- if ... }}),
+  # which are not valid standalone YAML — yamllint would misparse the
+  # control structures as syntax errors. `helm lint` and `helm template |
+  # kubeconform` validate these; NOTES.txt isn't YAML at all.
+  charts/**/templates/
