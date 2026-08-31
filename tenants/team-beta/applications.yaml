@@ -1,0 +1,62 @@
+# Both dev and prod deploy into the SAME namespace (team-beta) — this repo
+# demonstrates two environment overlays of one tenant's app side by side
+# rather than modeling dev/prod as separate namespaces/tenants. They don't
+# collide: each Application's name becomes the Helm release name, so the
+# chart's fullname template produces distinct resource names
+# ("team-beta-dev-webapp" vs "team-beta-prod-webapp") and distinct Ingress
+# hosts (see envs/dev/team-beta.yaml and envs/prod/team-beta.yaml).
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: team-beta-dev
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  # Scoped to the team-beta AppProject (not "default"): this is what makes
+  # appproject.yaml's clusterResourceWhitelist/namespaceResourceBlacklist
+  # actually bind to this Application instead of being purely decorative.
+  project: team-beta
+  source:
+    repoURL: https://github.com/sofa4578/gitops-k8s-platform.git
+    targetRevision: main
+    path: charts/webapp
+    helm:
+      valueFiles:
+        - ../../envs/dev/team-beta.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: team-beta
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: team-beta-prod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: team-beta
+  source:
+    repoURL: https://github.com/sofa4578/gitops-k8s-platform.git
+    targetRevision: main
+    path: charts/webapp
+    helm:
+      valueFiles:
+        - ../../envs/prod/team-beta.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: team-beta
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

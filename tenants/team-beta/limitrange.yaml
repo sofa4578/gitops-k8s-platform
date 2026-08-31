@@ -1,0 +1,27 @@
+# Without this, a pod created with no resources block at all (e.g. an
+# ad-hoc "kubectl run" debug pod) would be admitted with no requests and no
+# limits, and could silently consume the entire namespace ResourceQuota —
+# defaultRequest/default below match charts/webapp/values.yaml's own
+# defaults exactly, so an unconfigured pod behaves the same as the chart's
+# baseline instead of something unbounded.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: team-beta
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: 500m
+        memory: 128Mi
+      min:
+        cpu: 50m
+        memory: 64Mi
+      max:
+        cpu: "1"
+        memory: 512Mi

@@ -1,0 +1,28 @@
+# Sized for BOTH tenant Applications (dev and prod, see applications.yaml)
+# running in this one namespace at once: worst case is prod's HPA scaled to
+# its maxReplicas (6, at 200m cpu / 256Mi mem request, 500m cpu / 256Mi mem
+# limit each — see envs/prod/team-beta.yaml) plus dev's single replica,
+# with headroom left for ad-hoc debug pods (kubectl run / exec).
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: team-beta
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 2Gi
+    limits.cpu: "4"
+    limits.memory: 3Gi
+    count/pods: "20"
+    # Tenants reach the cluster only through the shared ingress-nginx
+    # controller (see charts/webapp Service, always ClusterIP) — a
+    # tenant-provisioned LoadBalancer would be a second, ungoverned entry
+    # point and, on a real cloud, a surprise bill. This is the native
+    # ResourceQuota key for that specific check: unlike the generic
+    # "count/<resource>" object-count mechanism (which only matches whole,
+    # API-discoverable resource kinds — see count/pods above), Service
+    # objects can't be filtered by spec.type that way, so Kubernetes
+    # special-cases "services.loadbalancers" without a "count/" prefix.
+    services.loadbalancers: "0"

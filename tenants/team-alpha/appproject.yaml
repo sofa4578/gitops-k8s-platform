@@ -1,0 +1,27 @@
+# Least privilege for GitOps: this bounds what any Application that
+# declares "project: team-alpha" (see applications.yaml) is allowed to sync,
+# regardless of what's committed under tenants/team-alpha/. Even if someone
+# commits a ClusterRoleBinding here, Argo CD refuses to apply it — the
+# blacklist below also stops a tenant-scoped Application from touching its
+# own ResourceQuota/LimitRange; only the root Application (project: default,
+# see bootstrap/root-app.yaml) may.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: team-alpha
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  description: Tenant project for team-alpha
+  sourceRepos:
+    - https://github.com/sofa4578/gitops-k8s-platform.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: team-alpha
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange

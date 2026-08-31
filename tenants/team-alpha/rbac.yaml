@@ -1,0 +1,69 @@
+# Namespace-scoped Role for the team-alpha application team: read on the
+# common workload/networking resources they need to diagnose their own
+# deployment, plus "pods/exec" to attach a debug shell — nothing this Role
+# grants reaches past the team-alpha namespace (it's a Role, not a
+# ClusterRole), and the AppProject's namespaceResourceBlacklist (see
+# appproject.yaml) stops even a compromised GitOps sync from widening it.
+#
+# "secrets" is deliberately NOT in the readable resource list: SealedSecrets
+# in this namespace decrypt into real Secret objects, and a broad get/list
+# on Secrets would hand the whole team plaintext credentials that a
+# narrower, per-secret grant should gate instead.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: team-alpha-developer
+  namespace: team-alpha
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - services
+      - configmaps
+      - endpoints
+      - persistentvolumeclaims
+      - events
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  # Debugging only: attach to a running container. This is the one write-ish
+  # verb in an otherwise read-only Role.
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: team-alpha-developer
+  namespace: team-alpha
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+subjects:
+  # A Group, not a named User: this maps to an OIDC group claim from
+  # whatever identity provider is wired into the API server's
+  # --oidc-group-claim. This local/portfolio cluster has no real IdP
+  # attached, so this binding is illustrative of the intended shape rather
+  # than something a human can actually authenticate as today.
+  - kind: Group
+    name: team-alpha-developers
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: team-alpha-developer
+  apiGroup: rbac.authorization.k8s.io
