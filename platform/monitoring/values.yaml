@@ -1,0 +1,31 @@
+# Deliberately minimal overrides for kube-prometheus-stack (chart 88.6.2).
+# A full observability stack (Alertmanager routing, long retention, persistent
+# storage) is out of scope here — see docs/BLUEPRINT.md section 12. The goal
+# of this project is a platform that is observable *enough* to prove its own
+# health, not a production monitoring deployment.
+
+alertmanager:
+  # No on-call routing to configure in a portfolio/local project — alerting
+  # rules are documented in docs/ instead of wired to a real receiver.
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    # Short retention: this is a local kind cluster that gets torn down
+    # between sessions, not a system with data worth keeping.
+    retention: 6h
+    # Explicitly no PersistentVolumeClaim — Prometheus operator falls back to
+    # an ephemeral emptyDir, which is fine for a cluster with no persistence
+    # guarantees anyway.
+    storageSpec: {}
+
+grafana:
+  # Dashboards still need somewhere to render, so Grafana itself stays enabled;
+  # only its persistence is disabled to match "no persistent storage" above.
+  # The chart auto-generates a random admin password into a Secret named
+  # "monitoring-grafana" when adminPassword/admin.existingSecret are left
+  # unset (never hardcode one here) — retrieve it locally with:
+  #   kubectl -n monitoring get secret monitoring-grafana \
+  #     -o jsonpath='{.data.admin-password}' | base64 -d
+  persistence:
+    enabled: false

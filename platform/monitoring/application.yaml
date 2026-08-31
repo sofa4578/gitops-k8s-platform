@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  # No sync-wave: nothing else depends on monitoring being ready first, and it
+  # depends on nothing earlier either — it only needs the cluster to be up.
+spec:
+  project: default
+  # Multi-source: the chart comes straight from the upstream Helm repo, and the
+  # override values file is pulled from this git repo via the `ref: values`
+  # source so it stays reviewable in PRs instead of being inlined as a string.
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 88.6.2
+      helm:
+        valueFiles:
+          - $values/platform/monitoring/values.yaml
+    - repoURL: https://github.com/sofa4578/gitops-k8s-platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
