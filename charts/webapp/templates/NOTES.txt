@@ -1,0 +1,17 @@
+{{ include "webapp.fullname" . }} has been deployed.
+
+Check rollout status:
+  kubectl rollout status deployment/{{ include "webapp.fullname" . }} -n {{ .Release.Namespace }}
+
+{{- if .Values.ingress.enabled }}
+
+Reach the app through its Ingress:
+  http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}
+(make sure the host resolves to the ingress-nginx controller, e.g. via
+/etc/hosts on a local kind cluster)
+{{- else }}
+
+No Ingress is enabled for this release. Reach the app with a port-forward:
+  kubectl port-forward svc/{{ include "webapp.fullname" . }} -n {{ .Release.Namespace }} 8080:80
+then open http://localhost:8080/
+{{- end }}

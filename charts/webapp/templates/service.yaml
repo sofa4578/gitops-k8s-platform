@@ -1,0 +1,18 @@
+# ClusterIP only — LoadBalancer is off the table by design (and blocked by
+# tenant ResourceQuota): every tenant reaches the cluster through the single
+# shared ingress-nginx entrypoint, not one cloud load balancer each.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "webapp.fullname" . }}
+  labels:
+    {{- include "webapp.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "webapp.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

@@ -1,0 +1,132 @@
+# Default values for webapp.
+# Every tenant Application overrides a subset of these via its own values
+# file (see envs/) — these defaults are intentionally the safest possible
+# starting point, not a production-ready configuration.
+
+image:
+  # No default repository: every consumer must set its own image explicitly
+  # (values.schema.json enforces this is non-empty) rather than silently
+  # inheriting someone else's image.
+  repository: ""
+  # Never "latest" — values.schema.json rejects that tag outright so a
+  # release always pins a specific, reproducible build.
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# Dedicated ServiceAccount for the app pod (see serviceaccount.yaml).
+serviceAccount:
+  # Set false to use the namespace's "default" ServiceAccount instead.
+  create: true
+  # Left empty to let the fullname template generate one; set to reuse an
+  # existing ServiceAccount name instead of creating a new one.
+  name: ""
+
+# Only used when autoscaling.enabled is false — see the "trap #1" comment in
+# templates/deployment.yaml for why replicas is omitted entirely otherwise.
+replicaCount: 1
+
+# App-level configuration rendered into templates/configmap.yaml and
+# consumed by the Deployment as env vars (also drives the checksum/config
+# annotation that restarts pods when this changes).
+config:
+  # Matches src/webapp/app/main.py's APP_ENV env var (default "local" when
+  # unset). Tenant values files should override this to "dev" / "prod".
+  appEnv: local
+  # Free-text log verbosity; the app itself does not read this yet, but it
+  # is the standard first key every tenant config carries.
+  logLevel: info
+
+# Additional container env vars beyond the ones the chart always sets
+# (POD_NAME via downward API, APP_ENV from the ConfigMap). Each entry is a
+# full Kubernetes EnvVar struct, e.g.:
+#   env:
+#     - name: FEATURE_FLAG_X
+#       value: "true"
+env: []
+
+# requests size the scheduler's bin-packing and the HPA's CPU baseline;
+# limits are the hard ceiling. memory.limit intentionally equals
+# memory.request (Guaranteed QoS for memory — no OOM surprise from
+# overcommit); cpu.limit is set above cpu.request because CPU is a
+# compressible resource and throttling a short burst beats never allowing
+# one.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 128Mi
+
+# CPU-based HorizontalPodAutoscaler. Disabled by default so every chart
+# consumer starts on the simple, explicit replicaCount path; tenants that
+# want autoscaling turn this on in their own values file (prod tenants
+# per blueprint section 11: minReplicas 2, maxReplicas 6).
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      # 300s stabilization window: wait 5 minutes of sustained low CPU
+      # before removing a replica, so a brief dip doesn't scale down and
+      # immediately scale back up again (flapping) under bursty load.
+      stabilizationWindowSeconds: 300
+
+# Single-tenant Ingress: one hostname, TLS via cert-manager. Disabled by
+# default — a chart consumer that only needs ClusterIP+port-forward (e.g. a
+# quick local smoke test) shouldn't have to provision an Ingress at all.
+ingress:
+  enabled: false
+  # No implicit default class: the blueprint calls out relying on a cluster
+  # default IngressClass as a source of confusion, so this is always set
+  # explicitly wherever ingress.enabled is true.
+  className: nginx
+  host: webapp.example.com
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+  tls:
+    enabled: true
+    # Secret name cert-manager will create/renew via the ClusterIssuer
+    # above; left empty here so tenant values files name it after their
+    # own hostname.
+    secretName: ""
+
+podDisruptionBudget:
+  # Off by default: a single-replica dev deployment can't satisfy
+  # minAvailable: 2 anyway. Prod-like tenants (replicaCount/HPA minReplicas
+  # >= 2) turn this on.
+  enabled: false
+  minAvailable: 2
+
+networkPolicy:
+  # Off by default so the chart also works in a plain namespace with no
+  # ingress-nginx label present; tenant namespaces turn this on (see
+  # templates/networkpolicy.yaml for the exact allow-list).
+  enabled: false
+
+# Pod- and container-level securityContext. These are the non-negotiable
+# platform baseline (see templates/deployment.yaml) and are exposed here so
+# a consumer can only ever loosen individual fields deliberately, not so
+# that the baseline itself is optional.
+securityContext:
+  pod:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  container:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

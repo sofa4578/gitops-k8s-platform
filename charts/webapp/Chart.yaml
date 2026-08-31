@@ -1,0 +1,12 @@
+apiVersion: v2
+name: webapp
+description: Generic web application chart used by platform tenants
+type: application
+# version: the chart's own release number, bumped on template/values changes.
+# appVersion: the default application version this chart deploys, purely
+# informational (`helm.sh/chart` / `app.kubernetes.io/version` labels) —
+# each tenant overrides image.tag per release regardless of this value.
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers:
+  - name: Sofiia Levko

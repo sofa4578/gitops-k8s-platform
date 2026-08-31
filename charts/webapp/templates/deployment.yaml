@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "webapp.fullname" . }}
+  labels:
+    {{- include "webapp.labels" . | nindent 4 }}
+spec:
+  {{- /*
+  trap #1: never render spec.replicas when the HPA owns it. Argo CD's
+  self-heal reconciles spec back to what's in git on every diff; if replicas
+  were set here too, the HPA writing a new replica count would be treated as
+  drift and reverted, fighting the HPA every reconcile loop.
+  */}}
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  # maxUnavailable: 0 — never drop below the current healthy replica count
+  # mid-rollout; maxSurge: 1 — bring up one extra replica at a time instead
+  # of replacing the whole fleet at once.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "webapp.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "webapp.labels" . | nindent 8 }}
+      annotations:
+        # Forces a rolling restart on any config-only change: without this,
+        # a ConfigMap edit with no image/spec change would sync cleanly in
+        # Argo CD but pods would keep running with the old env until they
+        # happened to restart for some other reason.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "webapp.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext.pod | nindent 8 }}
+      # 30s grace period + 5s preStop sleep: on SIGTERM the pod is removed
+      # from Service/Endpoints immediately, but kube-proxy and the Ingress
+      # controller take a moment to stop sending it new traffic. The sleep
+      # keeps the container up long enough to drain those in-flight
+      # requests instead of dropping connections mid-rollout.
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "webapp.selectorLabels" . | nindent 14 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext.container | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "webapp.fullname" . }}
+          env:
+            # Downward API, not a hardcoded value: the app surfaces this on
+            # GET / so a rollout or crash is traceable to a specific pod.
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          # Liveness: cheap, no external dependency — only asks "is the
+          # process alive". A dependency failing here would cause the
+          # kubelet to restart otherwise-healthy pods in a cascade.
+          # Readiness: allowed to be more thorough and more frequent since a
+          # failure only pulls the pod out of the Service, it doesn't
+          # restart it.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          lifecycle:
+            preStop:
+              exec:
+                # Runs before SIGTERM propagates; sleeping here — not in the
+                # app itself — buys time for the endpoint removal to reach
+                # kube-proxy/Ingress before the process actually stops
+                # accepting connections.
+                command: ["/bin/sh", "-c", "sleep 5"]
+          volumeMounts:
+            # readOnlyRootFilesystem: true means the container image's
+            # filesystem is immutable, but uvicorn still needs somewhere
+            # writable (temp files, sockets) — an emptyDir is the smallest
+            # writable exception that doesn't weaken the rest of the image.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
