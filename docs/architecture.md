@@ -144,7 +144,7 @@ Wave  3:  tenant webapp Applications (dev and prod)
 `bootstrap/root-app.yaml` is a **multi-source** Application — this is a
 deliberate deviation from the blueprint's original single-source example,
 documented here because it fixes a real gap: a single `path: platform`
-source (as the blueprint's Крок 6.1 literally shows) would never
+source (as the blueprint's Phase 6, step 6.1 literally shows) would never
 reconcile `tenants/` at all, and wave 2/3 above are defined entirely
 under `tenants/`. `root-app.yaml` instead declares two recursive
 directory sources — `platform/` and `tenants/` — so both trees are
