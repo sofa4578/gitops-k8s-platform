@@ -1,7 +1,4 @@
-# App configuration, kept small and non-secret on purpose: anything that
-# needs to stay out of git (credentials, tokens) is a SealedSecret, never a
-# key here. deployment.yaml hashes this file into a checksum/config pod
-# annotation so a config-only change still triggers a rolling restart.
+# non-secret config only — anything sensitive goes in a SealedSecret
 apiVersion: v1
 kind: ConfigMap
 metadata:

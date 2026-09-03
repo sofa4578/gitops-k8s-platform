@@ -1,11 +1,8 @@
 name: ci-app
 
-# Application code: lint, test, build, scan, publish. This workflow never
-# receives cluster credentials, a kubeconfig, or a step that runs `kubectl`
-# against a real API server — delivery is pull-based via Argo CD only, which
-# is the central security property of this whole project (see
-# docs/architecture.md). Compromising this pipeline compromises, at worst,
-# the image it can push to GHCR — never the cluster.
+# App code: lint, test, build, scan, publish. No cluster credentials here —
+# delivery is pull-based via Argo CD, so the worst this can do is push a bad
+# image to GHCR.
 "on":
   push:
     branches: [main]
@@ -79,10 +76,7 @@ jobs:
           image-ref: ${{ steps.tags.outputs.full }}
           exit-code: "1"
           severity: "CRITICAL"
-          # A scan step that runs and ignores its own result is worse than no
-          # scan at all — it creates a false sense of security. exit-code 1
-          # fails the job on any CRITICAL finding, before the image ever
-          # reaches the registry.
+          # exit-code 1 so a CRITICAL actually blocks the push
 
       - name: Log in to GHCR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -93,8 +87,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push image
-        # Only on a push to main, never on a PR — a PR from any contributor,
-        # including an external one, must never be able to publish an image.
+        # main only — a PR must never be able to publish an image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
         with:

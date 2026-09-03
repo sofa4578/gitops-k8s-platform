@@ -4,8 +4,7 @@ metadata:
   name: metrics-server
   namespace: argocd
   annotations:
-    # wave 0: no CRDs of its own, but the HPA on the tenant webapp (wave 3)
-    # needs the metrics.k8s.io API available to compute desired replicas
+    # wave 0: metrics API needed before HPA can scale
     argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
@@ -15,11 +14,7 @@ spec:
     targetRevision: 3.14.0
     helm:
       values: |
-        # --kubelet-insecure-tls: kind's kubelet serving certificate is not
-        # signed by a CA metrics-server trusts, so the default TLS verification
-        # fails and metrics-server CrashLoopBackOffs. Acceptable ONLY for local
-        # kind development — a real cluster must present a properly signed
-        # kubelet certificate instead of disabling verification.
+        # kind only — real clusters need proper kubelet certs
         args:
           - --kubelet-insecure-tls
   destination:

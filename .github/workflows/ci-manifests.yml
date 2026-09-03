@@ -1,10 +1,7 @@
 name: ci-manifests
 
-# Validates everything that isn't application code: the Helm chart itself,
-# the platform Applications, tenant policies, and every env x tenant values
-# combination. Deliberately has zero cluster access — see ci-app.yml's header
-# for the same point about application code, and docs/architecture.md for why
-# that's the project's central security property.
+# Everything that isn't app code: chart, platform Applications, tenant
+# policies, every env x tenant values combo. No cluster access.
 "on":
   pull_request:
     paths:
@@ -39,10 +36,7 @@ jobs:
           version: ${{ env.HELM_VERSION }}
 
       - name: helm lint
-        # values.schema.json requires image.repository to be non-empty and
-        # the chart's own values.yaml deliberately leaves it blank (forces
-        # every real consumer to set it explicitly) — ci-values.yaml is the
-        # dedicated override that satisfies the schema for linting only.
+        # values.yaml leaves image.repository empty, ci-values.yaml fills it in
         run: helm lint charts/webapp -f charts/webapp/ci-values.yaml
 
       - name: Install helm-unittest
@@ -87,8 +81,5 @@ jobs:
             | sh -s -- -b /usr/local/bin
 
       - name: trivy config (policy checks on rendered manifests)
-        # Catches the class of mistake CLAUDE.md's known traps describe:
-        # missing runAsNonRoot, privileged containers, absent resource
-        # limits. Informational severity floor — HIGH/CRITICAL only, so a
-        # LOW-severity best-practice note doesn't block a PR.
+        # catches missing runAsNonRoot, privileged containers, absent limits
         run: trivy config --exit-code 1 --severity HIGH,CRITICAL rendered.yaml

@@ -4,8 +4,7 @@ metadata:
   name: ingress-nginx
   namespace: argocd
   annotations:
-    # wave 0: no CRDs of its own, but must be ready before tenant Ingress
-    # objects (wave 3) can resolve an ingressClassName
+    # wave 0: ingress controller before tenant apps
     argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default

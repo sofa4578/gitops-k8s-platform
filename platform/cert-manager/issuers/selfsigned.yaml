@@ -1,15 +1,7 @@
-# Local-cluster TLS chain, no external dependency: a bootstrap self-signed
-# ClusterIssuer mints one CA certificate, and a second ClusterIssuer of type
-# "ca" signs every tenant Certificate off that CA. A single self-signed
-# ClusterIssuer used directly by every Ingress would work too, but browsers
-# would then need to trust a different, unrelated CA per certificate; this
-# two-step pattern gives the platform one CA a developer can import once
-# (kubectl get secret webapp-ca -n cert-manager -o jsonpath='{.data.tls\.crt}'
-# | base64 -d) and trust for every tenant hostname.
-#
-# All three resources sit at sync-wave 1: cert-manager's CRDs (Certificate,
-# ClusterIssuer, ...) only exist once its Application — wave -1 — has synced,
-# so anything referencing those kinds must come strictly after it.
+# selfSigned issuer -> one CA cert -> ca issuer that signs tenant certs.
+# One CA to import locally instead of one per hostname:
+#   kubectl get secret webapp-ca -n cert-manager -o jsonpath='{.data.tls\.crt}' | base64 -d
+# wave 1 everywhere here: cert-manager CRDs land at wave -1
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:

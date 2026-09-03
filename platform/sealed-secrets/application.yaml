@@ -4,8 +4,7 @@ metadata:
   name: sealed-secrets
   namespace: argocd
   annotations:
-    # wave -1: the controller must exist before any SealedSecret committed to
-    # this repo can be decrypted into a real Secret
+    # wave -1: controller must be up before any SealedSecret is applied
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   project: default
@@ -13,8 +12,7 @@ spec:
     repoURL: https://bitnami.github.io/sealed-secrets
     chart: sealed-secrets
     targetRevision: 2.19.3
-  # Deployed into kube-system, matching the architecture table: the controller
-  # is cluster-scoped infrastructure, not a tenant-facing workload.
+  # kube-system: cluster infrastructure, not a tenant workload
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system

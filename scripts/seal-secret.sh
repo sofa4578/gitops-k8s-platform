@@ -1,35 +1,16 @@
 #!/usr/bin/env bash
 #
-# seal-secret.sh — the one sanctioned path for adding a tenant secret to
-# this repository. It never writes plaintext to disk: it pipes a
-# --dry-run=client Secret manifest straight into kubeseal and prints (or
-# redirects) the resulting SealedSecret, which is safe to commit to Git.
+# Seals a secret into a committable SealedSecret. Prints to stdout, never
+# writes plaintext to disk, never applies anything.
 #
-# Prerequisites:
-#   - kubectl, pointed at the target cluster (read access is enough; this
-#     script never applies anything, it only asks the API server to render
-#     a Secret it will never create).
-#   - kubeseal 0.27.1, matching the sealed-secrets controller version this
-#     platform deploys (see platform/sealed-secrets/application.yaml).
-#     Install it from the *bitnami* org (the project moved from
-#     bitnami-labs to bitnami; bitnami-labs.github.io/sealed-secrets now
-#     404s):
+# Needs kubectl + kubeseal 0.27.1, and a cluster with the sealed-secrets
+# controller up (kubeseal pulls its public key over the API, so no offline use).
 #
-#       KUBESEAL_VERSION=0.27.1
-#       ARCH=amd64   # or arm64
-#       curl -sLo kubeseal.tar.gz \
-#         "https://github.com/bitnami/sealed-secrets/releases/download/v${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION}-linux-${ARCH}.tar.gz"
-#       tar xzf kubeseal.tar.gz kubeseal
-#       sudo install kubeseal /usr/local/bin/
-#
-#   - A reachable cluster with the sealed-secrets controller running in
-#     kube-system: kubeseal fetches the controller's *public* key over the
-#     Kubernetes API to encrypt with, so this script cannot run offline and
-#     cannot run against a cluster that hasn't bootstrapped platform/
-#     sealed-secrets yet.
-#
-# This script only ever prints a SealedSecret to stdout. It does not run
-# kubectl apply and does not touch the cluster's actual state.
+#   KUBESEAL_VERSION=0.27.1
+#   ARCH=amd64   # or arm64
+#   curl -sLo kubeseal.tar.gz \
+#     "https://github.com/bitnami/sealed-secrets/releases/download/v${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION}-linux-${ARCH}.tar.gz"
+#   tar xzf kubeseal.tar.gz kubeseal && sudo install kubeseal /usr/local/bin/
 set -euo pipefail
 
 readonly CONTROLLER_NAMESPACE="kube-system"
@@ -43,9 +24,8 @@ printed on stdout. Redirect it into the tenant's directory to commit it.
 
 Arguments:
   <namespace>    Namespace the Secret (and SealedSecret) will live in.
-                 A SealedSecret is bound to this namespace + name pair at
-                 encryption time — it cannot be copied to another
-                 namespace and still decrypt.
+                 Sealed against this namespace+name pair, so it won't
+                 decrypt if copied elsewhere.
   <secret-name>  Name of the Secret to create.
   KEY=VALUE      One or more literal entries, e.g. API_KEY=changeme.
                  At least one is required.
@@ -68,10 +48,7 @@ die() {
   exit 1
 }
 
-# A DNS-1123 label: lowercase alphanumeric and '-', not starting or ending
-# with '-'. Both Kubernetes namespaces and Secret names must satisfy this,
-# so validating here fails fast with a clear message instead of letting
-# kubectl reject it deeper in the pipeline.
+# DNS-1123 label — fail fast here instead of deep in the pipeline
 is_dns1123_label() {
   [[ "$1" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]
 }
@@ -103,9 +80,7 @@ is_dns1123_label "$namespace" \
 is_dns1123_label "$secret_name" \
   || die "'$secret_name' is not a valid Secret name (lowercase alphanumeric and '-')."
 
-# Everything left on the command line must be a KEY=VALUE literal.
-# Validated up front, before anything touches the cluster, so a typo fails
-# with a precise message instead of a confusing kubectl/kubeseal error.
+# validate KEY=VALUE pairs before anything touches the cluster
 literal_args=()
 for pair in "$@"; do
   key="${pair%%=*}"
@@ -126,9 +101,7 @@ command -v kubectl >/dev/null 2>&1 \
 command -v kubeseal >/dev/null 2>&1 \
   || die "kubeseal not found on PATH. Install v0.27.1 — see the comment block at the top of this script."
 
-# --dry-run=client: kubectl only renders YAML locally, it never sends this
-# plaintext Secret to the API server. kubeseal is the only step that talks
-# to the cluster, and only to fetch the controller's public key.
+# --dry-run=client: renders locally, the plaintext Secret never leaves the machine
 kubectl create secret generic "$secret_name" \
   --namespace "$namespace" \
   "${literal_args[@]}" \

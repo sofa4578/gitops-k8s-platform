@@ -4,8 +4,7 @@ metadata:
   name: cert-manager
   namespace: argocd
   annotations:
-    # wave -1: CRDs (Certificate, ClusterIssuer, ...) must exist before the
-    # ClusterIssuer in platform/cert-manager/issuers/ applies at wave 1
+    # wave -1: CRDs must exist before ClusterIssuer at wave 1
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   project: default

@@ -1,8 +1,4 @@
-# Three policies, applied together, that make this namespace deny-by-default
-# and then re-open exactly the traffic a tenant needs. See
-# docs/troubleshooting.md for the single most common mistake made with this
-# file: applying default-deny-all without allow-dns-egress leaves pods
-# Running but every DNS lookup (including Service DNS) hangs until timeout.
+# default-deny with explicit allows for ingress-nginx and DNS
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -46,10 +42,7 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # trap #4: BOTH protocols. UDP 53 is the common case, but resolvers fall
-    # back to TCP 53 for answers too large for a single UDP datagram (e.g. a
-    # Service with many endpoints) — allow only UDP and that fallback query
-    # times out exactly the same way a fully-missing rule would.
+    # both protocols — DNS falls back to TCP for large responses
     - to:
         - namespaceSelector:
             matchLabels:

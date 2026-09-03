@@ -1,8 +1,4 @@
-# kind cluster config for the local GitOps platform.
-# Three nodes: with only one node, PodDisruptionBudgets and
-# topologySpreadConstraints have nothing to demonstrate and podAntiAffinity
-# can never be satisfied. Two workers are the minimum on which those
-# mechanisms are actually visible.
+# 3 nodes — PDB and topologySpreadConstraints do nothing on a single node
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: gitops-platform
@@ -14,9 +10,7 @@ nodes:
         nodeRegistration:
           kubeletExtraArgs:
             node-labels: "ingress-ready=true"
-    # kind runs inside Docker, so without an explicit port mapping the
-    # ingress-nginx controller is unreachable from the host. This is the
-    # most common cause of "ingress does not work" on kind.
+    # kind runs in docker, no mapping means no ingress from the host
     extraPortMappings:
       - containerPort: 80
         hostPort: 80

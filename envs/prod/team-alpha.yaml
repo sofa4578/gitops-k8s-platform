@@ -1,23 +1,15 @@
-# Prod overlay for team-alpha: values only, no templates (see
-# charts/webapp/values.yaml for what each key controls and its default).
-# Applied by tenants/team-alpha/applications.yaml (the "team-alpha-prod"
-# Application).
+# prod overlay for team-alpha, values only. Applied by the team-alpha-prod Application.
 
 image:
   repository: ghcr.io/sofa4578/webapp
-  # Pinned, non-"latest" placeholder tag — values.schema.json rejects
-  # "latest" outright. Bumped by scripts/ once CI actually publishes builds.
+  # placeholder until CI publishes real builds; schema rejects "latest"
   tag: "0.1.0"
 
-# Ignored by templates/deployment.yaml while autoscaling.enabled is true
-# (trap #1 — rendering spec.replicas here too would fight the HPA for the
-# field). Left explicit anyway as the replica count this release starts
-# from before the HPA's own steady-state takes over.
+# ignored while autoscaling is on; kept as the starting count
 replicaCount: 3
 
 autoscaling:
   enabled: true
-  # Per blueprint section 11.
   minReplicas: 2
   maxReplicas: 6
 
@@ -27,29 +19,21 @@ resources:
     memory: 256Mi
   limits:
     cpu: 500m
-    # Guaranteed QoS for memory (limit == request), matching the same
-    # rationale as the chart's own default in values.yaml — no OOM surprise
-    # from memory overcommit.
+    # limit == request, Guaranteed QoS for memory
     memory: 256Mi
 
 podDisruptionBudget:
   enabled: true
-  # Per blueprint section 14: never let voluntary disruption (node drain,
-  # cluster-autoscaler consolidation) take more than one replica out of a
-  # minReplicas: 2 fleet at once.
+  # drain can't take more than one of the two out at a time
   minAvailable: 2
 
 config:
   appEnv: prod
-  # Chart default ("info") is fine for prod — dev overrides this to "debug".
+  # logLevel stays at the chart default
 
 ingress:
   enabled: true
   className: nginx
   host: alpha.platform.local
-  # cert-manager.io/cluster-issuer stays at the chart default ("selfsigned",
-  # see charts/webapp/values.yaml), which matches this platform's local
-  # ClusterIssuer (platform/cert-manager/issuers/selfsigned.yaml). To use
-  # real TLS with Let's Encrypt, override this annotation to
-  # letsencrypt-staging or letsencrypt-prod here and apply
-  # platform/cert-manager/issuers/letsencrypt.yaml.
+  # issuer stays at the chart default (selfsigned). For real TLS, override
+  # cert-manager.io/cluster-issuer here and apply the letsencrypt issuer.

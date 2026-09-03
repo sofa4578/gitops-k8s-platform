@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
 #
-# teardown.sh — delete the local kind cluster entirely. Everything the
-# platform manages is reconstructed from Git by scripts/bootstrap.sh; the
-# one thing that is NOT reconstructed automatically is the sealed-secrets
-# controller's private key, generated fresh by a new cluster. Any
-# SealedSecret already committed to this repo was encrypted for the OLD
-# key and becomes permanently undecryptable the moment this script runs,
-# unless that key was backed up first (see docs/security.md's backup
-# procedure).
+# Deletes the kind cluster. Everything comes back from git except the
+# sealed-secrets private key — back it up first or every committed
+# SealedSecret is dead. See docs/security.md.
 set -euo pipefail
 
 readonly CLUSTER_NAME="${CLUSTER_NAME:-gitops-platform}"

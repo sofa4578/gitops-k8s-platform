@@ -1,10 +1,4 @@
-# Least privilege for GitOps: this bounds what any Application that
-# declares "project: team-beta" (see applications.yaml) is allowed to sync,
-# regardless of what's committed under tenants/team-beta/. Even if someone
-# commits a ClusterRoleBinding here, Argo CD refuses to apply it — the
-# blacklist below also stops a tenant-scoped Application from touching its
-# own ResourceQuota/LimitRange; only the root Application (project: default,
-# see bootstrap/root-app.yaml) may.
+# restricts what Applications scoped to this project can sync
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:

@@ -1,10 +1,4 @@
-# Both dev and prod deploy into the SAME namespace (team-alpha) — this repo
-# demonstrates two environment overlays of one tenant's app side by side
-# rather than modeling dev/prod as separate namespaces/tenants. They don't
-# collide: each Application's name becomes the Helm release name, so the
-# chart's fullname template produces distinct resource names
-# ("team-alpha-dev-webapp" vs "team-alpha-prod-webapp") and distinct
-# Ingress hosts (see envs/dev/team-alpha.yaml and envs/prod/team-alpha.yaml).
+# dev and prod in the same namespace, different release names
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -14,9 +8,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "3"
 spec:
-  # Scoped to the team-alpha AppProject (not "default"): this is what makes
-  # appproject.yaml's clusterResourceWhitelist/namespaceResourceBlacklist
-  # actually bind to this Application instead of being purely decorative.
+  # project: team-alpha, not default — this is what makes appproject.yaml bind
   project: team-alpha
   source:
     repoURL: https://github.com/sofa4578/gitops-k8s-platform.git

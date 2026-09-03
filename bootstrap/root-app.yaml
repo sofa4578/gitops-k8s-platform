@@ -7,12 +7,8 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  # Two directory sources instead of a single `path: platform`: tenant
-  # AppProject/RBAC/ResourceQuota/NetworkPolicy (wave 2) and the tenant webapp
-  # Applications (wave 3) live under tenants/, not platform/, so root must also
-  # recurse tenants/ to reconcile them. charts/, envs/, scripts/, docs/, kind/,
-  # bootstrap/, src/ and .github/ hold Helm chart sources, values-only files or
-  # CI config — not raw manifests — and stay out of both recursive sources.
+  # two sources: platform/ for infrastructure, tenants/ for isolation policies
+  # and app Applications
   sources:
     - repoURL: https://github.com/sofa4578/gitops-k8s-platform.git
       targetRevision: main

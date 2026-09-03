@@ -1,6 +1,4 @@
-# ClusterIP only — LoadBalancer is off the table by design (and blocked by
-# tenant ResourceQuota): every tenant reaches the cluster through the single
-# shared ingress-nginx entrypoint, not one cloud load balancer each.
+# ClusterIP only, tenants share the ingress-nginx entrypoint
 apiVersion: v1
 kind: Service
 metadata:

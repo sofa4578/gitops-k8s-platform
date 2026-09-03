@@ -1,10 +1,7 @@
 name: promote
 
-# Opens a PR that bumps envs/dev/*.yaml to the image just built by ci-app —
-# it never commits directly to main. A direct commit from a workflow would
-# bypass branch protection and make this pipeline a privileged actor with
-# write access to the deployed state; going through a PR keeps "every change
-# is reviewed" true even for automated changes (see docs/promotion.md).
+# Bumps envs/dev/*.yaml to the image ci-app just built.
+# PR not direct commit: branch protection applies to CI too.
 "on":
   workflow_run:
     workflows: ["ci-app"]
@@ -30,8 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           for f in envs/dev/team-alpha.yaml envs/dev/team-beta.yaml; do
-            # Replace only the value of the top-level image.tag key, leaving
-            # everything else (including image.repository) untouched.
+            # only the tag value, leave repository alone
             sed -i "s/^\(\s*tag:\s*\).*/\1\"${NEW_SHA}\"/" "$f"
           done
 

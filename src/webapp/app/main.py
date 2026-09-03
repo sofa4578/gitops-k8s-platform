@@ -1,12 +1,7 @@
-"""Minimal FastAPI service for the gitops-k8s-platform webapp.
+"""Demo webapp for the platform.
 
-Endpoints:
-  GET /        - app identity: name, version, pod name (downward API), environment
-  GET /health  - liveness probe, always 200 while the process is alive
-  GET /ready   - readiness probe, 503 until startup has finished
-  GET /metrics - Prometheus text exposition format
-  GET /crash   - (chaos, opt-in) kill the process to demo CrashLoopBackOff
-  GET /load    - (chaos, opt-in) burn CPU to demo HPA scale-out
+/ identity, /health liveness, /ready readiness, /metrics prometheus,
+/crash + /load chaos endpoints (opt-in).
 """
 
 import os
@@ -18,16 +13,11 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 APP_NAME = "gitops-k8s-platform-webapp"
 APP_VERSION = "0.1.0"
 
-# Read once at import time. In-cluster these come from the Deployment: POD_NAME
-# via the Kubernetes downward API, APP_ENV as a plain env var per values overlay.
-# The defaults let the app run and be tested with no cluster involved at all.
+# set by the Deployment; defaults keep it runnable outside a cluster
 POD_NAME = os.environ.get("POD_NAME", "unknown")
 APP_ENV = os.environ.get("APP_ENV", "local")
 
-# Chaos endpoints must never exist in a prod-like environment by accident, so the
-# flag is read once here and used below to decide whether to register the routes
-# at all, not merely whether to answer them - an unset/false flag means the paths
-# 404 exactly like any other undefined route.
+# gates route registration below, so unset means the paths just 404
 ENABLE_CHAOS_ENDPOINTS = os.environ.get("ENABLE_CHAOS_ENDPOINTS", "false") == "true"
 
 REQUEST_COUNT = Counter(
@@ -43,10 +33,7 @@ REQUEST_LATENCY = Histogram(
 
 app = FastAPI(title=APP_NAME, version=APP_VERSION)
 
-# Readiness is deliberately a separate signal from liveness: liveness answers
-# "is the process alive", readiness answers "has startup finished and can this
-# pod safely receive traffic behind a Service/Ingress". The flag starts false
-# and is flipped exactly once, by the startup event handler below.
+# separate from liveness: gates traffic, not restarts
 _ready = False
 
 
@@ -57,13 +44,10 @@ async def _mark_ready() -> None:
 
 
 class PrometheusMiddleware:
-    """Plain ASGI middleware, not Starlette's BaseHTTPMiddleware, so it observes
-    the real status code written to the wire for every request - /metrics itself
-    included - rather than a value re-derived from the route's return value."""
+    """Plain ASGI, not BaseHTTPMiddleware — sees the real status code on the wire."""
 
     def __init__(self, app):
-        # Starlette's middleware stack instantiates every middleware as
-        # cls(app=inner_app, **options), so the parameter must be named "app".
+        # must be named "app", Starlette calls cls(app=inner_app)
         self.app = app
 
     async def __call__(self, scope, receive, send):
@@ -73,7 +57,7 @@ class PrometheusMiddleware:
 
         path = scope["path"]
         start = time.perf_counter()
-        status_code = 500  # overwritten below unless the app never responds
+        status_code = 500  # overwritten unless the app never responds
 
         async def send_wrapper(message):
             nonlocal status_code
@@ -119,21 +103,14 @@ async def metrics() -> Response:
 
 
 if ENABLE_CHAOS_ENDPOINTS:
-    # Registered inside this guard - not just answered differently inside a
-    # handler - so that with the flag unset (the default everywhere except an
-    # explicit HPA/CrashLoopBackOff demo) these paths do not exist at all.
-
     @app.get("/crash")
     async def crash() -> None:
-        # os._exit skips cleanup and finally blocks on purpose: it reproduces a
-        # hard process kill so the kubelet observes a genuine CrashLoopBackOff
-        # instead of a graceful shutdown.
+        # os._exit, not sys.exit — want a hard kill, not a graceful shutdown
         os._exit(1)
 
     @app.get("/load")
     async def load() -> dict:
-        # A busy-loop, not a sleep: this has to burn real CPU so an HPA with a
-        # CPU-utilization target has something to react to.
+        # busy-loop not sleep, the HPA needs real CPU to react to
         duration_seconds = 2.0
         deadline = time.perf_counter() + duration_seconds
         while time.perf_counter() < deadline:

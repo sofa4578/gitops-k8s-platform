@@ -1,14 +1,5 @@
-# Namespace-scoped Role for the team-beta application team: read on the
-# common workload/networking resources they need to diagnose their own
-# deployment, plus "pods/exec" to attach a debug shell — nothing this Role
-# grants reaches past the team-beta namespace (it's a Role, not a
-# ClusterRole), and the AppProject's namespaceResourceBlacklist (see
-# appproject.yaml) stops even a compromised GitOps sync from widening it.
-#
-# "secrets" is deliberately NOT in the readable resource list: SealedSecrets
-# in this namespace decrypt into real Secret objects, and a broad get/list
-# on Secrets would hand the whole team plaintext credentials that a
-# narrower, per-secret grant should gate instead.
+# read-only on the team's own namespace + pods/exec for debugging.
+# no secrets in the list — SealedSecrets decrypt into real Secrets here
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -41,8 +32,7 @@ rules:
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses", "networkpolicies"]
     verbs: ["get", "list", "watch"]
-  # Debugging only: attach to a running container. This is the one write-ish
-  # verb in an otherwise read-only Role.
+  # only write-ish verb in the Role
   - apiGroups: [""]
     resources: ["pods/exec"]
     verbs: ["create"]
@@ -55,11 +45,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 subjects:
-  # A Group, not a named User: this maps to an OIDC group claim from
-  # whatever identity provider is wired into the API server's
-  # --oidc-group-claim. This local/portfolio cluster has no real IdP
-  # attached, so this binding is illustrative of the intended shape rather
-  # than something a human can actually authenticate as today.
+  # OIDC group claim — no IdP wired up locally, so this is shape only
   - kind: Group
     name: team-beta-developers
     apiGroup: rbac.authorization.k8s.io

@@ -3,13 +3,11 @@ kind: Application
 metadata:
   name: monitoring
   namespace: argocd
-  # No sync-wave: nothing else depends on monitoring being ready first, and it
-  # depends on nothing earlier either — it only needs the cluster to be up.
+  # no sync-wave, nothing depends on it either way
 spec:
   project: default
-  # Multi-source: the chart comes straight from the upstream Helm repo, and the
-  # override values file is pulled from this git repo via the `ref: values`
-  # source so it stays reviewable in PRs instead of being inlined as a string.
+  # multi-source: upstream chart + values from this repo, so values stay
+  # reviewable in PRs instead of inlined as a string
   sources:
     - repoURL: https://prometheus-community.github.io/helm-charts
       chart: kube-prometheus-stack

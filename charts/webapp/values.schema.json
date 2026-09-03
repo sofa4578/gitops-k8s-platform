@@ -19,7 +19,7 @@
           "not": {
             "const": "latest"
           },
-          "description": "Exact image tag. 'latest' is rejected: a release must always be reproducible and rollback-able to a known digest/tag."
+          "description": "Exact image tag. 'latest' is rejected — releases must be reproducible."
         },
         "pullPolicy": {
           "type": "string",

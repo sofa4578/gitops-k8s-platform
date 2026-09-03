@@ -2,11 +2,9 @@
 extends: default
 
 rules:
-  # Most manifests in this repo (Kubernetes objects, Argo CD Applications) are
-  # single-document files without a leading "---" — don't force one.
+  # most manifests here are single-doc, no leading ---
   document-start: disable
-  # Helm templates and multi-container specs run long; keep line-length a
-  # warning instead of a hard failure so CI doesn't block on cosmetic wrapping.
+  # warn, don't fail — k8s specs run long
   line-length:
     max: 200
     level: warning
@@ -14,11 +12,8 @@ rules:
   new-line-at-end-of-file: enable
 
 ignore: |
-  # Vendored Helm chart dependencies pulled by `helm dependency build`
+  # vendored chart deps
   charts/**/charts/
   *.tgz
-  # Helm template sources contain Go template directives ({{- if ... }}),
-  # which are not valid standalone YAML — yamllint would misparse the
-  # control structures as syntax errors. `helm lint` and `helm template |
-  # kubeconform` validate these; NOTES.txt isn't YAML at all.
+  # Go template directives aren't valid YAML; helm lint covers these
   charts/**/templates/

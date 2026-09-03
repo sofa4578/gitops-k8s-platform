@@ -1,13 +1,10 @@
 name: security
 
-# Scheduled + PR-triggered scans that don't fit ci-app (image scanning
-# happens there, gated on push) or ci-manifests (manifest policy scanning
-# happens there). This workflow specifically catches secrets committed to
-# history and filesystem-level vulnerabilities in application code.
+# Secrets in git history + filesystem CVEs. Image scanning lives in ci-app,
+# manifest policy checks in ci-manifests.
 "on":
   schedule:
-    # Monday 06:00 UTC — new CVEs are published continuously, so a build
-    # that was clean last week is not guaranteed clean today.
+    # weekly — last week's clean build isn't clean forever
     - cron: "0 6 * * 1"
   pull_request:
 
@@ -21,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          fetch-depth: 0  # full history, not just the merge commit
+          fetch-depth: 0  # full history
 
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0
         env:

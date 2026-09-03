@@ -1,16 +1,9 @@
 #!/usr/bin/env bash
 #
-# bootstrap.sh — from a running kind cluster (see `make up` / kind/cluster.yaml)
-# to a fully synced platform. This is the ONLY thing applied by hand
-# ("bootstrap/" per docs/architecture.md) — every subsequent change goes
-# through Git, never through this script again for day-to-day work. Re-running
-# it is safe: every step is either idempotent (`kubectl apply`) or checks
-# current state before waiting, so running it twice in a row (per blueprint
-# section 13's "make down && make up && bootstrap && verify" check) converges
-# to the same result both times.
+# Empty kind cluster -> fully synced platform. The only thing applied by hand;
+# everything after this goes through git. Safe to re-run.
 #
-# Requires: kubectl and helm/kustomize (bundled with modern kubectl via
-# `kubectl kustomize`), pointed at a cluster created by `make up`.
+# Needs kubectl pointed at a cluster from `make up`.
 set -euo pipefail
 
 echo "== Step 1/4: install Argo CD (bootstrap/argocd/, pinned v2.13.2) =="
@@ -20,15 +13,12 @@ echo "== Step 2/4: wait for argocd-server =="
 kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
 
 echo "== Step 3/4: apply the root Application (app-of-apps) =="
-# Idempotent: re-applying an unchanged Application is a no-op. root itself
-# then recursively reconciles platform/ and tenants/ (see bootstrap/root-app.yaml's
-# comment on why it needs both directory sources) — nothing after this point
-# is ever applied directly again.
+# root then reconciles platform/ and tenants/ on its own
 kubectl apply -f bootstrap/root-app.yaml
 
 echo "== Step 4/4: wait for every Application to become Synced/Healthy =="
 readonly POLL_INTERVAL_SECONDS=10
-readonly MAX_ATTEMPTS=60 # 60 * 10s = 10 minutes
+readonly MAX_ATTEMPTS=60  # 10 min
 
 for i in $(seq 1 "$MAX_ATTEMPTS"); do
   apps_json=$(kubectl -n argocd get applications -o json 2>/dev/null || echo '{"items":[]}')

@@ -1,8 +1,5 @@
 {{- if .Values.networkPolicy.enabled }}
-# Kubernetes' real default is "every pod can talk to every pod" — this
-# policy is the only thing that makes this namespace deny-by-default and
-# then re-opens exactly the traffic the app needs: ingress from the shared
-# ingress-nginx controller, and egress to DNS plus outbound HTTPS.
+# k8s default is all-pods-can-talk; this locks it to ingress-nginx in, DNS + 443 out
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -25,9 +22,7 @@ spec:
         - protocol: TCP
           port: 8000
   egress:
-    # trap #4: a default-deny NetworkPolicy blocks DNS too unless it is
-    # explicitly re-opened — both UDP and TCP 53, since resolvers fall back
-    # to TCP for answers too large for a single UDP datagram.
+    # both protocols — DNS falls back to TCP for large responses
     - to:
         - namespaceSelector:
             matchLabels:

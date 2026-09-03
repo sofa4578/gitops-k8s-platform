@@ -5,18 +5,11 @@ metadata:
   labels:
     {{- include "webapp.labels" . | nindent 4 }}
 spec:
-  {{- /*
-  trap #1: never render spec.replicas when the HPA owns it. Argo CD's
-  self-heal reconciles spec back to what's in git on every diff; if replicas
-  were set here too, the HPA writing a new replica count would be treated as
-  drift and reverted, fighting the HPA every reconcile loop.
-  */}}
+  {{- /* omit replicas when HPA is enabled — Argo CD self-heal would fight the HPA over this field */}}
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
-  # maxUnavailable: 0 — never drop below the current healthy replica count
-  # mid-rollout; maxSurge: 1 — bring up one extra replica at a time instead
-  # of replacing the whole fleet at once.
+  # maxUnavailable 0: new pod ready before old one terminates
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -30,20 +23,13 @@ spec:
       labels:
         {{- include "webapp.labels" . | nindent 8 }}
       annotations:
-        # Forces a rolling restart on any config-only change: without this,
-        # a ConfigMap edit with no image/spec change would sync cleanly in
-        # Argo CD but pods would keep running with the old env until they
-        # happened to restart for some other reason.
+        # restart on config change
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ include "webapp.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.securityContext.pod | nindent 8 }}
-      # 30s grace period + 5s preStop sleep: on SIGTERM the pod is removed
-      # from Service/Endpoints immediately, but kube-proxy and the Ingress
-      # controller take a moment to stop sending it new traffic. The sleep
-      # keeps the container up long enough to drain those in-flight
-      # requests instead of dropping connections mid-rollout.
+      # time for kube-proxy to drain connections before SIGTERM
       terminationGracePeriodSeconds: 30
       topologySpreadConstraints:
         - maxSkew: 1
@@ -66,8 +52,7 @@ spec:
             - configMapRef:
                 name: {{ include "webapp.fullname" . }}
           env:
-            # Downward API, not a hardcoded value: the app surfaces this on
-            # GET / so a rollout or crash is traceable to a specific pod.
+            # populated by downward API
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -75,18 +60,14 @@ spec:
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          # Liveness: cheap, no external dependency — only asks "is the
-          # process alive". A dependency failing here would cause the
-          # kubelet to restart otherwise-healthy pods in a cascade.
-          # Readiness: allowed to be more thorough and more frequent since a
-          # failure only pulls the pod out of the Service, it doesn't
-          # restart it.
+          # cheap check, no deps — failing here causes cascading restarts
           livenessProbe:
             httpGet:
               path: /health
               port: http
             initialDelaySeconds: 20
             periodSeconds: 10
+          # more thorough, only removes from Service on fail
           readinessProbe:
             httpGet:
               path: /ready
@@ -97,16 +78,10 @@ spec:
           lifecycle:
             preStop:
               exec:
-                # Runs before SIGTERM propagates; sleeping here — not in the
-                # app itself — buys time for the endpoint removal to reach
-                # kube-proxy/Ingress before the process actually stops
-                # accepting connections.
+                # wait for endpoint removal before accepting SIGTERM
                 command: ["/bin/sh", "-c", "sleep 5"]
           volumeMounts:
-            # readOnlyRootFilesystem: true means the container image's
-            # filesystem is immutable, but uvicorn still needs somewhere
-            # writable (temp files, sockets) — an emptyDir is the smallest
-            # writable exception that doesn't weaken the rest of the image.
+            # uvicorn needs writable /tmp under readOnlyRootFilesystem
             - name: tmp
               mountPath: /tmp
       volumes:

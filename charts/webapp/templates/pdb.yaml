@@ -1,8 +1,5 @@
 {{- if .Values.podDisruptionBudget.enabled }}
-# Bounds voluntary disruption (node drain, cluster-autoscaler consolidation)
-# separately from involuntary failures — kubectl drain blocks the eviction
-# until enough replacement pods are Ready, instead of taking the whole
-# workload down at once.
+# blocks drain evictions until replacements are Ready
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:

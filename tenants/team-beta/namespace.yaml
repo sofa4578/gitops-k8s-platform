@@ -1,16 +1,10 @@
-# Pod Security Admission labels enforce the "restricted" profile at the
-# namespace level — this is a control-plane guarantee, not something a pod
-# spec can opt out of, unlike the Helm chart's securityContext defaults
-# (which a consumer could in principle loosen in its own values file).
+# PSA restricted at namespace level — a pod spec can't opt out of this
 apiVersion: v1
 kind: Namespace
 metadata:
   name: team-beta
   annotations:
-    # wave -2: the namespace must exist before anything namespace-scoped
-    # (ResourceQuota, LimitRange, NetworkPolicy, RBAC — all wave 2) can be
-    # applied into it, and well before the tenant Applications (wave 3) ask
-    # Argo CD to sync workloads there.
+    # wave -2: namespace before anything namespace-scoped
     argocd.argoproj.io/sync-wave: "-2"
   labels:
     pod-security.kubernetes.io/enforce: restricted

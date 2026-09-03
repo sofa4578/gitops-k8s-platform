@@ -1,9 +1,4 @@
-"""Tests for the webapp's core HTTP endpoints.
-
-Only the contract the rest of the platform depends on is covered here: liveness
-always answers, readiness reflects real startup state, and the root endpoint
-carries the identity fields the chart/HPA demo relies on.
-"""
+"""Endpoint tests — the contract the probes and the chart depend on."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,9 +8,7 @@ from app.main import app
 
 @pytest.fixture(scope="module")
 def client():
-    # TestClient only runs the app's startup handler when used as a context
-    # manager (it drives the ASGI lifespan protocol on enter/exit), so the
-    # readiness flag would never flip without this "with".
+    # needs the "with" — that's what drives lifespan, otherwise /ready stays 503
     with TestClient(app) as test_client:
         yield test_client
 

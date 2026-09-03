@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 #
-# verify.sh — turns "seems to work" into a checkable fact. Every check below
-# exits non-zero on failure, so the whole script fails loudly (and with a
-# clear PASS/FAIL summary) the moment any one platform guarantee doesn't
-# hold. Intended to run after scripts/bootstrap.sh, and again after
-# scripts/drift-demo.sh or any manual poking, to confirm the platform is
-# still in the state Git says it should be in.
+# Asserts the platform's guarantees actually hold. Non-zero exit on any failure.
+# Run it after bootstrap.sh, or any time you've poked the cluster by hand.
 #
-# Requires: kubectl and jq, pointed at the bootstrapped cluster.
-set -uo pipefail # not -e: each check below reports its own PASS/FAIL and we
-                  # want every check to run even if an earlier one fails.
+# Needs kubectl + jq.
+
+# no -e: every check should run even if an earlier one fails
+set -uo pipefail
 
 FAILURES=0
 
@@ -40,9 +37,7 @@ if [[ -n "$apps_json" ]]; then
 fi
 
 echo "== Tenant webapp reachable over HTTPS =="
-# -k: the local ClusterIssuer is self-signed (see
-# platform/cert-manager/issuers/selfsigned.yaml) — this checks the app
-# answers, not that a public CA vouches for it.
+# -k: local issuer is self-signed
 if curl -kfsS --max-time 5 https://alpha.platform.local/health >/dev/null 2>&1; then
   pass "https://alpha.platform.local/health returned 200"
 else
@@ -50,9 +45,7 @@ else
 fi
 
 echo "== Cross-tenant network isolation (team-alpha -> team-beta must time out) =="
-# A timeout is the PASS condition here: it proves the tenant NetworkPolicy's
-# default-deny is actually blocking the request, not that the request
-# "succeeded" by any normal meaning of the word.
+# timeout == PASS here, it means default-deny is doing its job
 if kubectl -n team-alpha run verify-isolation --rm -i --quiet --restart=Never \
     --image=curlimages/curl:8.10.1 --command --timeout=15s \
     -- curl -m 5 -s -o /dev/null http://team-beta-prod-webapp.team-beta.svc.cluster.local >/dev/null 2>&1; then
@@ -65,11 +58,7 @@ echo "== RBAC least privilege: webapp's own ServiceAccount can do nothing =="
 can_i=$(kubectl auth can-i --list \
   --as="system:serviceaccount:team-alpha:team-alpha-prod-webapp" \
   -n team-alpha 2>&1) || true
-# The app's ServiceAccount has automountServiceAccountToken: false and no
-# Role/RoleBinding of its own (see charts/webapp/templates/serviceaccount.yaml
-# and blueprint section 11's three-tier RBAC design) — it should have
-# essentially nothing beyond the handful of verbs every authenticated
-# identity gets against SelfSubjectAccessReview/SelfSubjectRulesReview.
+# should be empty apart from the self-review verbs every identity gets
 excess=$(echo "$can_i" | grep -vE '^\s*$|^Resources|selfsubjectaccessreviews|selfsubjectrulesreviews|^  \*\.\*' | grep -c '.*' || true)
 if [[ "$excess" -le 3 ]]; then
   pass "system:serviceaccount:team-alpha:team-alpha-prod-webapp has no meaningful permissions"

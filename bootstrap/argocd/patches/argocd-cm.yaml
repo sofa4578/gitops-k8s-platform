@@ -1,25 +1,13 @@
-# Strategic-merge patch against the argocd-cm ConfigMap shipped in the
-# upstream install.yaml. Only the keys listed here are changed; everything
-# else in the upstream ConfigMap is left untouched.
+# strategic merge onto upstream argocd-cm, only the keys below change
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: argocd-cm
-  # No namespace here on purpose: kustomize matches this patch against the
-  # upstream resource *before* the top-level `namespace: argocd` transformer
-  # runs, and the upstream install.yaml ships argocd-cm without a namespace
-  # set. Adding one here makes the patch target nothing and kustomize fails
-  # with "no matches for Id ConfigMap.v1.[noGrp]/argocd-cm.argocd".
+  # no namespace — patch matching runs before the namespace transformer
 data:
-  # "annotation" stores tracking info in an annotation instead of the (default)
-  # "label" method. Labels are copied by some controllers and mutating
-  # webhooks, which can make Argo CD think a resource it doesn't own is one of
-  # its own; annotations aren't copied around the same way.
+  # annotations don't get copied by webhooks the way labels do
   application.resourceTrackingMethod: annotation
-  # Lease objects churn constantly (leader-election, node heartbeats) and
-  # Endpoints/EndpointSlice are rewritten on every pod readiness flip. Argo CD
-  # has no reason to track either as part of an Application's sync state, so
-  # watching them just adds noise and load to repo-server/application-controller.
+  # high-churn objects Argo CD has no reason to track
   resource.exclusions: |
     - apiGroups:
         - "coordination.k8s.io"
