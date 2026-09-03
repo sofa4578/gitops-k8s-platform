@@ -1,0 +1,54 @@
+name: promote
+
+# Opens a PR that bumps envs/dev/*.yaml to the image just built by ci-app —
+# it never commits directly to main. A direct commit from a workflow would
+# bypass branch protection and make this pipeline a privileged actor with
+# write access to the deployed state; going through a PR keeps "every change
+# is reviewed" true even for automated changes (see docs/promotion.md).
+"on":
+  workflow_run:
+    workflows: ["ci-app"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  open-promotion-pr:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: main
+
+      - name: Bump image.tag in envs/dev
+        env:
+          NEW_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          for f in envs/dev/team-alpha.yaml envs/dev/team-beta.yaml; do
+            # Replace only the value of the top-level image.tag key, leaving
+            # everything else (including image.repository) untouched.
+            sed -i "s/^\(\s*tag:\s*\).*/\1\"${NEW_SHA}\"/" "$f"
+          done
+
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(dev): promote webapp to ${{ github.event.workflow_run.head_sha }}"
+          title: "chore(dev): promote webapp to ${{ github.event.workflow_run.head_sha }}"
+          body: |
+            Automated promotion opened by the `promote` workflow after
+            [ci-app](../../actions/runs/${{ github.event.workflow_run.id }})
+            succeeded on `main`.
+
+            Bumps `image.tag` in `envs/dev/team-alpha.yaml` and
+            `envs/dev/team-beta.yaml` to the exact commit SHA that was just
+            built, scanned and pushed to GHCR — the same digest promoted to
+            prod later is byte-for-byte this one, never a rebuild.
+          branch: promote/dev-${{ github.event.workflow_run.head_sha }}
+          labels: promotion
+          delete-branch: true

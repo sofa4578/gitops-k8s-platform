@@ -1,0 +1,105 @@
+name: ci-app
+
+# Application code: lint, test, build, scan, publish. This workflow never
+# receives cluster credentials, a kubeconfig, or a step that runs `kubectl`
+# against a real API server — delivery is pull-based via Argo CD only, which
+# is the central security property of this whole project (see
+# docs/architecture.md). Compromising this pipeline compromises, at worst,
+# the image it can push to GHCR — never the cluster.
+"on":
+  push:
+    branches: [main]
+    paths:
+      - "src/webapp/**"
+  pull_request:
+    paths:
+      - "src/webapp/**"
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ghcr.io/sofa4578/webapp
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/webapp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --quiet -r requirements.txt ruff==0.16.5 pytest==9.1.1 httpx==0.28.1
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: pytest
+        run: pytest -q tests/
+
+  build:
+    name: build, scan and push
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "full=${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "short=${IMAGE_NAME}:sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build image (load locally, do not push yet)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: src/webapp
+          load: true
+          push: false
+          tags: |
+            ${{ steps.tags.outputs.full }}
+            ${{ steps.tags.outputs.short }}
+
+      - name: Trivy scan (gate on CRITICAL before anything is pushed)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          image-ref: ${{ steps.tags.outputs.full }}
+          exit-code: "1"
+          severity: "CRITICAL"
+          # A scan step that runs and ignores its own result is worse than no
+          # scan at all — it creates a false sense of security. exit-code 1
+          # fails the job on any CRITICAL finding, before the image ever
+          # reaches the registry.
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        # Only on a push to main, never on a PR — a PR from any contributor,
+        # including an external one, must never be able to publish an image.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: src/webapp
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.full }}
+            ${{ steps.tags.outputs.short }}

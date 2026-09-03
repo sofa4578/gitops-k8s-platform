@@ -1,0 +1,5 @@
+# A single-owner formality today, but a standard artifact reviewers look
+# for: it shows platform-critical paths are deliberately gated, not an
+# oversight of a repo with no review process at all.
+/charts/   @sofa4578
+/platform/ @sofa4578

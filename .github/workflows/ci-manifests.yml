@@ -1,0 +1,94 @@
+name: ci-manifests
+
+# Validates everything that isn't application code: the Helm chart itself,
+# the platform Applications, tenant policies, and every env x tenant values
+# combination. Deliberately has zero cluster access — see ci-app.yml's header
+# for the same point about application code, and docs/architecture.md for why
+# that's the project's central security property.
+"on":
+  pull_request:
+    paths:
+      - "charts/**"
+      - "platform/**"
+      - "tenants/**"
+      - "envs/**"
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: "3.21.4"
+  HELM_UNITTEST_VERSION: "v1.1.2"
+  KUBECONFORM_VERSION: "v0.8.0"
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install yamllint
+        run: pip install --quiet yamllint==1.38.0
+
+      - name: yamllint
+        run: yamllint -c .yamllint.yaml .
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: helm lint
+        # values.schema.json requires image.repository to be non-empty and
+        # the chart's own values.yaml deliberately leaves it blank (forces
+        # every real consumer to set it explicitly) — ci-values.yaml is the
+        # dedicated override that satisfies the schema for linting only.
+        run: helm lint charts/webapp -f charts/webapp/ci-values.yaml
+
+      - name: Install helm-unittest
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version ${{ env.HELM_UNITTEST_VERSION }}
+
+      - name: helm unittest
+        run: helm unittest charts/webapp
+
+  validate:
+    name: validate (${{ matrix.env }} / ${{ matrix.tenant }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prod]
+        tenant: [team-alpha, team-beta]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${{ env.KUBECONFORM_VERSION }}/kubeconform-linux-amd64.tar.gz" \
+            | tar xz kubeconform
+          sudo install kubeconform /usr/local/bin/kubeconform
+
+      - name: Render ${{ matrix.env }}/${{ matrix.tenant }}
+        run: |
+          helm template webapp charts/webapp \
+            -f "envs/${{ matrix.env }}/${{ matrix.tenant }}.yaml" \
+            > rendered.yaml
+
+      - name: kubeconform (strict schema validation)
+        run: kubeconform -strict -summary rendered.yaml
+
+      - name: Install Trivy
+        run: |
+          curl -sSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      - name: trivy config (policy checks on rendered manifests)
+        # Catches the class of mistake CLAUDE.md's known traps describe:
+        # missing runAsNonRoot, privileged containers, absent resource
+        # limits. Informational severity floor — HIGH/CRITICAL only, so a
+        # LOW-severity best-practice note doesn't block a PR.
+        run: trivy config --exit-code 1 --severity HIGH,CRITICAL rendered.yaml
