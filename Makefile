@@ -26,7 +26,7 @@ seal-secret:  ## Wrap kubeseal (usage: make seal-secret ARGS="-n team-alpha secr
 
 lint:  ## Lint YAML manifests and the webapp Helm chart
 	yamllint -c .yamllint.yaml .
-	helm lint charts/webapp
+	helm lint charts/webapp -f charts/webapp/ci-values.yaml
 	helm unittest charts/webapp
 
 test:  ## Run the webapp unit tests

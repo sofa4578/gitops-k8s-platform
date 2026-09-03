@@ -208,7 +208,7 @@ Full runbook: `docs/troubleshooting.md`. The two most common issues:
 
 - Argo CD runs as a single replica (non-HA) — a real deployment would run it with multiple controller/repo-server replicas.
 - Runs on a local kind cluster, not a cloud-managed one.
-- TLS is self-signed locally; the Let's Encrypt DNS-01 issuer (`platform/cert-manager/issuers/letsencrypt.yaml`) exists but needs a real domain and Cloudflare token to actually issue a certificate.
+- TLS is self-signed locally; the Let's Encrypt DNS-01 issuer (`platform/cert-manager/issuers/letsencrypt.yaml`) exists but needs a real domain and Cloudflare token to actually issue a certificate. To use real TLS with Let's Encrypt, override the `cert-manager.io/cluster-issuer` annotation to `letsencrypt-prod` or `letsencrypt-staging` in your env values file and apply `platform/cert-manager/issuers/letsencrypt.yaml`.
 - No log aggregation — `kubectl logs` only. A full stack (Loki/ELK) is deliberately out of scope for this project; see the observability project this platform is designed to later host.
 - No stateful workloads and no backup/restore story beyond the sealed-secrets private key (see `docs/security.md`) and the Git repository itself.
 

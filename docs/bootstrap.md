@@ -75,40 +75,23 @@ sequence twice in a row converges to the same result both times.
 - `make verify`: one `PASS` line per check, ending in
   `verify.sh: all checks PASSED`.
 
-## Two most likely failure modes on a first run
+## Most likely failure mode on a first run
 
-1. **`kind create cluster` fails with "port is already allocated."**
-   Something else on your machine (a local nginx, Docker Desktop's own
-   proxy) already holds host port 80 or 443. Either free the port, or
-   edit `kind/cluster.yaml`'s `extraPortMappings` to use 8080/8443 and
-   adjust every `*.platform.local` URL in this document accordingly.
+**`kind create cluster` fails with "port is already allocated."**
+Something else on your machine (a local nginx, Docker Desktop's own
+proxy) already holds host port 80 or 443. Either free the port, or edit
+`kind/cluster.yaml`'s `extraPortMappings` to use 8080/8443 and adjust
+every `*.platform.local` URL in this document accordingly.
 
-2. **`make lint` fails on the bare `helm lint charts/webapp` step.**
-   This is expected, not a bug in the chart: `charts/webapp/values.yaml`
-   deliberately ships with an empty `image.repository` (see the comment
-   there) so that no consumer silently inherits someone else's image, and
-   `values.schema.json` requires that field to be non-empty. Lint against
-   a real values file instead —
-   `helm lint charts/webapp -f charts/webapp/ci-values.yaml` (what CI
-   actually runs) or `helm lint charts/webapp -f envs/prod/team-alpha.yaml`
-   both pass cleanly. `make lint`'s bare invocation was written before
-   this design settled and is a known one-line fix left for the next
-   commit, not something to "work around" by editing the chart.
-
-A third, smaller thing worth knowing about rather than debugging: the
-chart's own default Ingress annotation
-(`cert-manager.io/cluster-issuer: letsencrypt-staging`) does not match
-this repository's default local ClusterIssuer name (`selfsigned`, see
-`platform/cert-manager/issuers/selfsigned.yaml`). Every `envs/*.yaml`
-file in this repo currently inherits that chart default rather than
-overriding it, so a `Certificate` created fresh from this repo as
-committed will sit in `Ready: False` until you either edit the relevant
-`envs/*.yaml` file's `ingress.annotations` to say `selfsigned`, or apply
-`platform/cert-manager/issuers/letsencrypt.yaml` for real (see that
-file's own header for why that path needs a real domain and Cloudflare
-token to actually succeed). `docs/troubleshooting.md` scenario 4 covers
-the general Certificate-debugging chain if you go looking for this the
-hard way first.
+`charts/webapp`'s default Ingress annotation
+(`cert-manager.io/cluster-issuer: selfsigned`) already matches this
+repository's local ClusterIssuer
+(`platform/cert-manager/issuers/selfsigned.yaml`), so a `Certificate`
+issued out of the box against this repo as committed goes `Ready: True`
+with no per-env override needed. To use real TLS with Let's Encrypt
+instead, override the `cert-manager.io/cluster-issuer` annotation to
+`letsencrypt-staging` or `letsencrypt-prod` in your env values file and
+apply `platform/cert-manager/issuers/letsencrypt.yaml`.
 
 See `docs/troubleshooting.md` for the full runbook if any of the above
 doesn't resolve what you're seeing.

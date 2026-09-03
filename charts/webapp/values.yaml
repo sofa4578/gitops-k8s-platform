@@ -85,7 +85,12 @@ ingress:
   className: nginx
   host: webapp.example.com
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    # Matches the "selfsigned" ClusterIssuer this platform's local kind
+    # bootstrap actually creates (see
+    # platform/cert-manager/issuers/selfsigned.yaml) — a real deployment
+    # against a public domain overrides this per-env to letsencrypt-staging
+    # or letsencrypt-prod (see platform/cert-manager/issuers/letsencrypt.yaml).
+    cert-manager.io/cluster-issuer: selfsigned
   tls:
     enabled: true
     # Secret name cert-manager will create/renew via the ClusterIssuer

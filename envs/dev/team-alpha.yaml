@@ -36,7 +36,9 @@ ingress:
   # tenants/team-alpha/applications.yaml) and takes the bare hostname, so
   # dev needs a distinct host to avoid an Ingress collision.
   host: alpha-dev.platform.local
-  # cert-manager.io/cluster-issuer stays at the chart default
-  # (letsencrypt-staging) for now; platform/cert-manager/issuers/ (a later
-  # phase) introduces the local self-signed ClusterIssuer this should
-  # actually point at for a kind cluster.
+  # cert-manager.io/cluster-issuer stays at the chart default ("selfsigned",
+  # see charts/webapp/values.yaml), which matches this platform's local
+  # ClusterIssuer (platform/cert-manager/issuers/selfsigned.yaml). To use
+  # real TLS with Let's Encrypt, override this annotation to
+  # letsencrypt-staging or letsencrypt-prod here and apply
+  # platform/cert-manager/issuers/letsencrypt.yaml.

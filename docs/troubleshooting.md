@@ -114,10 +114,12 @@ kubectl -n cert-manager logs deploy/cert-manager --tail=100
 `Ready: False`; an HTTP-01 challenge that's unreachable from outside; a
 wrong DNS-01 API token; the Let's Encrypt rate limit (50 certificates per
 domain per week); or a typo in the `cert-manager.io/cluster-issuer`
-annotation's issuer name. In this repository specifically, check that
-name first — see `docs/bootstrap.md`'s note on the chart defaulting to
-`letsencrypt-staging` while the local ClusterIssuer this repo ships is
-named `selfsigned`.
+annotation's issuer name. In this repository specifically, that name
+defaults to `selfsigned` (`charts/webapp/values.yaml`), matching
+`platform/cert-manager/issuers/selfsigned.yaml` — a typo is most likely
+if you've overridden it in an `envs/*.yaml` file to point at
+`letsencrypt-staging` or `letsencrypt-prod` without also applying
+`platform/cert-manager/issuers/letsencrypt.yaml`.
 
 **Fix.** The Certificate -> CertificateRequest -> Order -> Challenge chain
 always terminates at the real cause on its last existing resource. When
