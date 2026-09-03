@@ -1,0 +1,49 @@
+# Local-cluster TLS chain, no external dependency: a bootstrap self-signed
+# ClusterIssuer mints one CA certificate, and a second ClusterIssuer of type
+# "ca" signs every tenant Certificate off that CA. A single self-signed
+# ClusterIssuer used directly by every Ingress would work too, but browsers
+# would then need to trust a different, unrelated CA per certificate; this
+# two-step pattern gives the platform one CA a developer can import once
+# (kubectl get secret webapp-ca -n cert-manager -o jsonpath='{.data.tls\.crt}'
+# | base64 -d) and trust for every tenant hostname.
+#
+# All three resources sit at sync-wave 1: cert-manager's CRDs (Certificate,
+# ClusterIssuer, ...) only exist once its Application — wave -1 — has synced,
+# so anything referencing those kinds must come strictly after it.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-bootstrap
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: webapp-ca
+  namespace: cert-manager
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  isCA: true
+  commonName: gitops-k8s-platform-local-ca
+  secretName: webapp-ca
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-bootstrap
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  ca:
+    secretName: webapp-ca
