@@ -5,7 +5,7 @@
 ## Local validation run
 
 - [ ] `yamllint -c .yamllint.yaml .`
-- [ ] `helm lint charts/webapp`
+- [ ] `helm lint charts/webapp -f charts/webapp/ci-values.yaml`
 - [ ] `helm unittest charts/webapp`
 - [ ] `cd src/webapp && pytest -q tests/`
 
