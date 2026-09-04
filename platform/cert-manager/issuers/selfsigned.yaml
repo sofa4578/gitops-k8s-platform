@@ -8,6 +8,8 @@ metadata:
   name: selfsigned-bootstrap
   annotations:
     argocd.argoproj.io/sync-wave: "1"
+    # root doesn't wait for cert-manager's CRDs, so let this retry
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   selfSigned: {}
 ---
@@ -18,6 +20,8 @@ metadata:
   namespace: cert-manager
   annotations:
     argocd.argoproj.io/sync-wave: "1"
+    # root doesn't wait for cert-manager's CRDs, so let this retry
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   isCA: true
   commonName: gitops-k8s-platform-local-ca
@@ -36,6 +40,8 @@ metadata:
   name: selfsigned
   annotations:
     argocd.argoproj.io/sync-wave: "1"
+    # root doesn't wait for cert-manager's CRDs, so let this retry
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   ca:
     secretName: webapp-ca

@@ -10,6 +10,8 @@ metadata:
   annotations:
     # wave 1, after cert-manager CRDs
     argocd.argoproj.io/sync-wave: "1"
+    # root doesn't wait for cert-manager's CRDs, so let this retry
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   acme:
     # staging first — prod rate limit is 50 certs/domain/week. Switch to
