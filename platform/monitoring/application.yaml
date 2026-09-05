@@ -25,5 +25,7 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    # SSA: kube-prometheus CRDs blow the client-side annotation limit
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
