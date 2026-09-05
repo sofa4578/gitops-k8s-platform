@@ -5,6 +5,18 @@ alertmanager:
   # nothing to route alerts to locally
   enabled: false
 
+prometheusOperator:
+  admissionWebhooks:
+    # The certgen hook job patches caBundle into the webhook configs in-cluster,
+    # but git has it empty, so selfHeal wipes it every reconcile and the
+    # apiserver then rejects the operator's cert ("tls: bad certificate").
+    # The webhook only syntax-checks PrometheusRule/AlertmanagerConfig, which
+    # isn't worth that drift loop here.
+    enabled: false
+  tls:
+    # no webhook to serve, so no serving cert to manage either
+    enabled: false
+
 prometheus:
   prometheusSpec:
     # local cluster, gets torn down anyway
